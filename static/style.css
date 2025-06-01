@@ -1050,22 +1050,21 @@ svg#dots {
   /* min-height: 100px; */
 }
 
-.chat-icon img {
-  width: 24px;
-  height: 24px;
+.chat-icon {
+  width: 30px;
+  height: 28px;
   opacity: 0.6;
 }
 
 .input-area {
-  position: relative;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  background-color: #f7f7f8;
-  border: 1px solid #ccc;
-  border-radius: 16px;
-  padding: 8px 12px;
-  min-height: 80px;
+    position: relative;
+    flex: 1;
+    display: flex;
+    background-color: #f7f7f8;
+    border: 1px solid #ccc;
+    border-radius: 16px;
+    padding: 8px;
+    min-height: 90px;
 }
 
 .chat-textarea {
@@ -1089,7 +1088,7 @@ svg#dots {
 }
 
 .send-button img {
-  width: 20px;
-  height: 20px;
+  width: 30px;
+  height: 24px;
   opacity: 0.8;
 }
