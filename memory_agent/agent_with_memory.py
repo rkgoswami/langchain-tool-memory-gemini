@@ -26,7 +26,8 @@ from langchain.agents import load_tools
 
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder, HumanMessagePromptTemplate, SystemMessagePromptTemplate
 
-
+from dotenv import load_dotenv
+load_dotenv()
 # ------------------------- Gemini Setup -------------------------
 os.environ["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY")  # Store key in environment variable
 

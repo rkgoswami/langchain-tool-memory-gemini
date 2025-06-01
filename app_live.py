@@ -13,10 +13,11 @@ from langchain.memory import ConversationBufferMemory
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder, HumanMessagePromptTemplate, SystemMessagePromptTemplate
 from langchain.agents import initialize_agent, AgentType
 from langchain.agents import load_tools
+from dotenv import load_dotenv
+load_dotenv()
 
 app = Flask(__name__, static_folder="static")
 socketio = SocketIO(app, cors_allowed_origins="*")
-
 chat_agent = None
 
 
