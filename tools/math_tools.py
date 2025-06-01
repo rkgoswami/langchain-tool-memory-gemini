@@ -1,12 +1,12 @@
 from langchain_core.tools import tool
 
 @tool
-def add(a: int, b: int) -> int:
+def custom_add(a: int, b: int) -> int:
     """Adds two integers."""
     return a + b
 
 @tool
-def divide(a: int, b: int) -> float:
+def custom_divide(a: int, b: int) -> float:
     """Divides two integers."""
     if b == 0:
         raise ValueError("Cannot divide by zero.")

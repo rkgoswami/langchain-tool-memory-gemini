@@ -4,8 +4,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 from archive.agent import add
 from tools import get_user_details
-from tools.math_tools import divide
-from tools.user_tools import get_user_details
+from tools import ALL_TOOLS
 from config import GOOGLE_API_KEY
 
 
@@ -26,7 +25,8 @@ class ChatAgent:
         tools = load_tools(tool_names, llm=self.llm)
 
         # Add custom tools
-        tools.append(get_user_details)
+        for tool in ALL_TOOLS:
+            tools.append(tool)
         # self.llm.bind_tools(self.tools)
         return tools   
     
