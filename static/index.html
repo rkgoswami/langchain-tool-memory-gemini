@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/npm/markdown-it/dist/markdown-it.min.js"></script>
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+  <title>Aviator Chat</title>
+  <link href="/static/style.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.8.1/github-markdown-light.css" />
+</head>
+<body>
+  <div class="response-aviator-panel">
+    <div class="container">
+      <div class="content">
+        <!-- Footer -->
+        <div class="footer">
+          <div class="footer-content">
+            <div class="frame-427319359">
+              <div class="icon">
+                <div class="subtle-button">
+                  <div class="container2">
+                    <div class="icon-comment-new">
+                      <img class="icon2" src="/static/icons/icon1.svg" alt="comment icon">
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="base-input-has-control">
+                <div class="input">
+                  <textarea id="input" class="text" placeholder="Placeholder text"></textarea>
+                  <div class="icon">
+                    <div class="control">
+                      <div class="container2">
+                        <button id="send">
+                          <img class="icon-send" src="/static/icons/icon-send0.svg" alt="send icon" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="linear-gradient"></div>
+        </div>
+        <!-- Header -->
+        <div class="header">
+          <div class="container3">
+            <div class="header-content">
+              <div class="mime-aviator">
+                <div class="mime-aviator-light">
+                  <img class="mime" src="/static/icons/mime0.svg" alt="aviator icon">
+                </div>
+              </div>
+              <div class="title-area">
+                <div class="aviator">Aviator</div>
+                <div class="sub-title-area">
+                  <div class="sub-title">Sub Title</div>
+                </div>
+              </div>
+              <div class="subtle-button">
+                <div class="container2">
+                  <div class="icon-history">
+                    <img class="icon3" src="/static/icons/icon3.svg" alt="history icon">
+                  </div>
+                </div>
+              </div>
+              <div class="close-icon">
+                <div class="container2">
+                  <img class="icon-more-horizontal" src="/static/icons/icon-more-horizontal0.svg" alt="more icon">
+                </div>
+              </div>
+              <div class="close-icon">
+                <div class="container2">
+                  <div class="icon-close">
+                    <img class="icon4" src="/static/icons/icon4.svg" alt="close icon">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="linear-gradient2"></div>
+        </div>
+        <!-- Chat Messages Section -->
+        <div class="content-area markdown-body" id="messages"></div>
+      </div>
+    </div>
+  </div>
+  <script>
+    const socket = io();
+    const md = window.markdownit({
+      html: true,
+      breaks: true,
+      linkify: true,
+      typographer: false,
+      quotes: '“”‘’',
+    });
+    // Use a persistent session id for the room, so history works across reloads
+    let sessionId = localStorage.getItem("chat_session_id");
+    if (!sessionId) {
+      sessionId = 'room_' + Math.random().toString(36).substr(2, 9);
+      localStorage.setItem("chat_session_id", sessionId);
+    }
+    socket.emit('join', { room: sessionId });
+
+    // Only show the final answer from the agent
+    function extractFinalAnswer(text) {
+      const match = text.match(/Final Answer:(.*)$/s);
+      return match ? match[1].trim() : text;
+    }
+
+    // Append a message to the chat area
+    function appendMessage(text, sender) {
+      const messages = document.getElementById("messages");
+      const wrapper = document.createElement("div");
+      if (sender === "user") {
+        wrapper.className = "user-message";
+        wrapper.innerHTML = `<div class="message-box"><div class="user-query-can-span-many-lines-and-should-always-wrap-with-no-truncation">${md.render(text)}</div></div>`;
+      } else if (sender === "agent") {
+        wrapper.className = "paragraph";
+        wrapper.innerHTML = `<div class="aviator-response"><div class="aviator-dp"><div class="container2"><div class="mime-aviator-avatar"><div class="mime-aviator-avatar-light"><img class="mime3" src="/static/icons/mime2.svg" /></div></div></div></div><div class="content"><div class="paragraph2"><div class="temporibus-autem-quibusdam-et-aut-officiis-debitis-aut-rerum-necessitatibus-saepe-eveniet-ut-et-voluptates-repudiandae-sint-et-molestiae">$${md.render(text)}</div></div></div></div>`;
+      }
+      messages.appendChild(wrapper);
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    // Show typing indicator
+    function showTypingIndicator() {
+      const messages = document.getElementById("messages");
+      const indicator = document.createElement("div");
+      indicator.className = "message agent typing";
+      indicator.id = "typing-indicator";
+      indicator.textContent = "Generating...";
+      messages.appendChild(indicator);
+      messages.scrollTop = messages.scrollHeight;
+    }
+    function removeTypingIndicator() {
+      const typingEl = document.getElementById("typing-indicator");
+      if (typingEl) typingEl.remove();
+    }
+
+    // Handle chat history on join
+    socket.on('history', function(history) {
+      const messages = document.getElementById("messages");
+      messages.innerHTML = '';
+      history.forEach(msg => {
+        if (msg.user) appendMessage(msg.user, "user");
+        if (msg.ai) appendMessage(msg.ai, "agent");
+      });
+      messages.scrollTop = messages.scrollHeight;
+    });
+
+    // Handle agent response
+    socket.on('ai_message', function(data) {
+      removeTypingIndicator();
+      if (data.message) {
+        appendMessage(data.message, "agent");
+      }
+      document.getElementById("send").disabled = false;
+      document.getElementById("input").focus();
+    });
+
+    // Send message
+    const send = document.getElementById("send");
+    send.onclick = () => {
+      const input = document.getElementById("input");
+      const text = input.value.trim();
+      if (!text) return;
+      appendMessage(text, "user");
+      input.value = "";
+      send.disabled = true;
+      showTypingIndicator();
+      socket.emit("message", { room: sessionId, message: text });
+    };
+
+    // Enter to send
+    const input = document.getElementById("input");
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        send.click();
+      }
+    });
+  </script>
+</body>
+</html>
