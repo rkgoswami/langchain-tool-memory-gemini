@@ -333,7 +333,7 @@ table {
   flex-shrink: 0;
   position: relative;
   margin: 0px;
-  
+
 }
 
 .sub-title {
@@ -347,6 +347,7 @@ table {
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  margin: 0px;
 }
 
 .icon-history {
