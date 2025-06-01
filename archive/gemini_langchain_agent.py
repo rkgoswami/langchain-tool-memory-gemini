@@ -15,8 +15,8 @@ from HttpClient import HttpClient
 http_client = HttpClient()
 
 # STEP 1: Set API key
-os.environ["GOOGLE_API_KEY"] = "AIzaSyCxvSk9lOSzDoF7__xqKMxlxD7x9CJCyJU"  # <-- REMOVE HARDCODED KEY
-os.environ["TM_HOST"] = "https://talent-mobility-service.stage.walmart.com"
+os.environ["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY")
+os.environ["TM_HOST"] = os.getenv("TM_HOST")
 
 warnings.filterwarnings("ignore", message="Convert_system_message_to_human will be deprecated!")
 
