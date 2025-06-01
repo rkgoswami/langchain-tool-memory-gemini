@@ -40,10 +40,10 @@ table {
 
 .container {
   background: var(--background-elevation-level-2, #ffffff);
-  border-radius: var(--radii-xl, 12px) 0px 0px var(--radii-xl, 12px);
+  border-radius: 12px;
   border-style: solid;
   border-color: var(--border-color-primary, rgba(0, 0, 0, 0.15));
-  border-width: 1px 0px 1px 1px;
+  border-width: 1px;
   display: flex;
   flex-direction: row;
   gap: 0px;

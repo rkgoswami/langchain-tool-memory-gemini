@@ -1,6 +1,5 @@
-__pyache/*
-__pycache__/*
 4894_git.pub
 4894_git
-memory_agent/__pycache__/agent_with_memory.cpython-313.pyc
 .env
+**/__pycache__/**
+
