@@ -19,7 +19,9 @@ from langchain_core.messages import (
 )
 from langgraph.prebuilt import create_react_agent
 
-
+from dotenv import load_dotenv
+ 
+load_dotenv()
 # ------------------------- Gemini Setup -------------------------
 os.environ["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY")  # Store key in environment variable
 

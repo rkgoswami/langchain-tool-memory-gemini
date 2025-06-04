@@ -3,10 +3,11 @@ from langchain.agents import initialize_agent, AgentType, load_tools
 from langchain.memory import ConversationBufferMemory
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from archive.agent import add
-from tools import get_user_details
-from tools import ALL_TOOLS
+# from archive.agent import add
 from config import GOOGLE_API_KEY
+from langchain_core.runnables import RunnableConfig
+
+from tools import get_all_tools
 
 
 class ChatAgent:
@@ -24,9 +25,18 @@ class ChatAgent:
         # Load built-in LangChain tools
         tool_names = []
         tools = load_tools(tool_names, llm=self.llm)
-
+        config_dict = {
+            "tags": ["user-chat"],
+            "metadata": {"room_id": "abc123","session_id": "xyz789","anticsrftoken":"","cookie": ""},
+            "run_name": "chat-session-001",
+            "configurable": {
+                "session_id": "xyz789",  # Adding configurable field as per LangChain docs
+            }
+        }
+        # Create RunnableConfig instance
+        config = RunnableConfig(**config_dict)
         # Add custom tools
-        for tool in ALL_TOOLS:
+        for tool in get_all_tools(config):
             tools.append(tool)
 
         return tools
@@ -64,8 +74,10 @@ class ChatAgent:
         # Summarize older messages (if any)
         summary = ""
         if len(messages) > len(recent_messages):
-            old_messages = messages[:len(messages) - len(recent_messages)]
-            old_text = "\n".join(f"{msg.type.capitalize()}: {msg.content}" for msg in old_messages)
+            old_messages = messages[: len(messages) - len(recent_messages)]
+            old_text = "\n".join(
+                f"{msg.type.capitalize()}: {msg.content}" for msg in old_messages
+            )
 
             summary_prompt = f"Summarize this conversation:\n\n{old_text}"
             try:
@@ -75,7 +87,10 @@ class ChatAgent:
                 summary = "Summary unavailable due to error."
 
         # Return summary + recent as the prompt history
-        combined = f"use the Summary of earlier conversation to answer if required for memory : {summary}\n\n" + "\n".join(reversed(recent_messages))
+        combined = (
+            f"use the Summary of earlier conversation to answer if required for memory : {summary}\n\n"
+            + "\n".join(reversed(recent_messages))
+        )
         return combined.strip()
 
     def handle_input(self, user_input: str) -> str:
@@ -87,9 +102,12 @@ class ChatAgent:
 
             # Compose the final prompt manually
             final_input = f"{history}\nUser: {user_input}"
+            # print(f"Created config: {config}")  # Debug log
 
             # Invoke the agent with the composed input
-            response = self.agent.invoke({"input": final_input})
+            response = self.agent.invoke(
+                input={"input": final_input}
+            )
 
             # Extract the agent's reply
             output = response.get("output", "")
