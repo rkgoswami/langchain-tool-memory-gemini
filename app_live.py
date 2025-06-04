@@ -2,7 +2,9 @@ from flask import Flask, send_from_directory
 from flask_socketio import SocketIO, join_room, emit
 from agent.agent_base import ChatAgent
 import os
-
+from dotenv import load_dotenv
+ 
+load_dotenv()
 app = Flask(__name__, static_folder="static")
 socketio = SocketIO(app, cors_allowed_origins="*")
 
