@@ -1,0 +1,34 @@
+services:
+  toolbox:
+    build:
+      context: .
+      dockerfile: Dockerfile.toolbox
+    container_name: toolbox
+    environment:
+      - TOOLBOX_CONFIG=/etc/toolbox/config.yaml
+      - ILM_HOST=http://164.99.91.34:9888
+
+    volumes:
+      - ./tools/tools.yaml:/etc/toolbox/config.yaml:ro
+    ports:
+      - "4100:4100"
+      - "4000:4000"
+    networks:
+      - toolbox-network
+  # flask-app:
+  #   build:
+  #     context: .
+  #     dockerfile: dockerfile.flask
+  #   container_name: flask-app
+  #   ports:
+  #     - "4100:4100"
+  #   environment:
+  #     - FLASK_APP=applive.py
+  #     - FLASK_ENV=development
+  #   depends_on:
+  #     - toolbox
+  #   networks:
+  #     - toolbox-network
+
+networks:
+  toolbox-network:

@@ -1,0 +1,35 @@
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install required packages (curl, unzip) + AWS CLI
+RUN apt-get update && \
+    apt-get install -y curl unzip && \
+    curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+    unzip awscliv2.zip && \
+    ./aws/install && \
+    rm -rf awscliv2.zip aws/ && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Check AWS CLI version (optional)
+RUN aws --version
+
+# Copy Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy app code
+COPY . .
+
+EXPOSE 4100
+
+# OPTIONAL: If you want to preconfigure AWS, you can use environment variables or mount a credentials file
+# Example ENV setup (you can also pass these via `docker run -e` or a `.env` file)
+# ENV AWS_ACCESS_KEY_ID=your-access-key-id
+# ENV AWS_SECRET_ACCESS_KEY=your-secret-access-key
+# ENV AWS_DEFAULT_REGION=us-east-1
+
+# Or use a script to configure before running the app
+
+CMD ["python", "app_live.py"]

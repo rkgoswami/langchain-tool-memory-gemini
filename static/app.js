@@ -2,7 +2,7 @@
 
 class ChatApp {
   constructor() {
-    this.socket = io();
+    this.socket  = io({ path: "/ilmagent" });
     this.md = window.markdownit({
       html: true,
       breaks: true,

@@ -11,5 +11,7 @@ langchain-openai==0.3.10
 langchain-postgres==0.0.13
 langchain-text-splitters==0.3.7
 langchain_google_genai
-langgraph=0.4.7
-numexpr=2.10.2
+langgraph==0.4.7
+numexpr==2.10.2
+sentence-transformers
+opensearch-py

@@ -1,0 +1,10 @@
+neo4j:
+  uri: "neo4j+s://your-neo4j-instance-uri"
+  user: "neo4j-user"
+  password: "neo4j-password"
+  database: "neo4j-database"
+
+gemini:
+  model_name: "gemini-1.5"
+  api_key: ""
+

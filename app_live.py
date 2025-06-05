@@ -8,7 +8,12 @@ import json
  
 load_dotenv()
 app = Flask(__name__, static_folder="static")
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(
+    app,
+    path="/ilmagent",
+    cors_allowed_origins="*"
+)
+
 
 # Initialize agent
 
@@ -26,7 +31,10 @@ def send_static(path):
 @socketio.on('join')
 def handle_join(data):
     room = data['room']
-    chat_agent = ChatAgent()
+    token = request.args.get('token')
+    # Copy the cookie with name starting with 'IR=' if present
+    ir_cookie = f'IR={request.cookies.get("IR", "")}' 
+    chat_agent = ChatAgent(cookie=ir_cookie, token=token)
     
     state.clients[room] = chat_agent
     
@@ -38,24 +46,22 @@ def handle_message(data):
     room = data['room']
     user_msg = data['message']
     chat_agent = state.clients.get(room)
+    session_id = request.sid  # type: ignore # Use the WebSocket session ID as the session ID
+    
+    # You can now use ir_cookie as needed (e.g., add to context, log, etc.)
+    # user_info = {
+    #     "session_id": session_id,
+    #     "cookie": ir_cookie,
+    #     "token": token
+    # }
     if not chat_agent:
         print(f"[ERROR] No chat agent found for room {room}.") 
         # create a new agent if not found
         chat_agent = ChatAgent()
         state.clients[room] = chat_agent
         return
-    session_id = request.sid  # type: ignore # Use the WebSocket session ID as the session ID
-    token = request.args.get('token')
-    # Copy the cookie with name starting with 'IR=' if present
-    ir_cookie = f'IR={request.cookies.get("IR", "")}' 
-    # You can now use ir_cookie as needed (e.g., add to context, log, etc.)
-    user_info = {
-        "session_id": session_id,
-        "cookie": ir_cookie,
-        "token": token
-    }
-    user_info_json = json.dumps(user_info)
-    print(f"[DEBUG] User info: {user_info_json}")
+   
+    # user_info_json = json.dumps(user_info)
     print(f"[DEBUG] Message from room {room}: {user_msg}")
     ai_response = chat_agent.handle_input(user_msg)
 
@@ -64,4 +70,4 @@ def handle_message(data):
 
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True)
+    socketio.run(app, debug=True, host="0.0.0.0", port=4100, allow_unsafe_werkzeug=True)

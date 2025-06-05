@@ -11,7 +11,9 @@ from tools import get_all_tools
 
 
 class ChatAgent:
-    def __init__(self, temperature: float = 0.3):
+    def __init__(self, temperature: float = 0.3, cookie: str = "", token:any = ""):
+        self.cookie = cookie
+        self.token = token
         self.llm = ChatGoogleGenerativeAI(
             model="gemini-2.0-flash-lite", temperature=temperature
         )
@@ -27,10 +29,12 @@ class ChatAgent:
         tools = load_tools(tool_names, llm=self.llm)
         config_dict = {
             "tags": ["user-chat"],
-            "metadata": {"room_id": "abc123","session_id": "xyz789","anticsrftoken":"","cookie": ""},
+            "metadata": {"room_id": "abc123","session_id": "xyz789","anticsrftoken":self.token,"cookie": self.cookie},
             "run_name": "chat-session-001",
             "configurable": {
-                "session_id": "xyz789",  # Adding configurable field as per LangChain docs
+                "session_id": "xyz789",  # Adding configurable field as per LangChain docs,
+                "thread_id": "user-lookup-thread-1",
+                
             }
         }
         # Create RunnableConfig instance
@@ -49,6 +53,19 @@ class ChatAgent:
             memory=self.memory,
             handle_parsing_errors=True,
             verbose=True,
+            description="""
+            ### **Output Formatting & Behavior Expectations**
+                if data is already in a structured format like Markdown, use it directly in the response.
+                * **Markdown:** Always return responses in well-formatted **Markdown**.
+                * **Tables:** Use **tables** to structure data (e.g., user ID, name, email, role, status).
+                * **JSON:** For JSON data, prettify it inside a **code block** with `json` syntax highlighting.
+                * **Clarity:** Provide clear responses when no users or groups are found (e.g., "_No users found._").
+                * **Group Info:** For group-related requests, return information based on the group nodes in the Neo4j database.
+                * **Precision:** Be technically precise and concise. Do not repeat yourself.
+                * **XML Explanation:** When explaining XML, focus on clarity; use bullet points if helpful.
+                * **Error Handling:** Avoid hallucination. If a tool fails, explain the error gracefully.
+    """,
+            
         )
 
     def estimate_tokens(self, text: str) -> int:
