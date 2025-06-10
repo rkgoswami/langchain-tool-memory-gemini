@@ -46,4 +46,4 @@ EXPOSE 4100 4000
 # -------- Start both processes --------
 # You can use a small script or `bash -c` to launch both the Python app and Toolbox
 
-CMD bash -c "/toolbox-bin/toolbox serve --tools_file /etc/toolbox/config.yaml --port 4000 --address 0.0.0.0 & python app_live.py"
+CMD bash -c "/toolbox-bin/toolbox serve --tools_file /app/config.yaml --port 4000 --address 0.0.0.0 & python app_live.py"

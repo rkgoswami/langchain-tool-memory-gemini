@@ -1,4 +1,5 @@
 flask
+lxml
 flask-socketio
 langchain
 google-generativeai

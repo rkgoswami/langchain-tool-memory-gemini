@@ -6,13 +6,14 @@ from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableConfig
-from langchain_core.tools import Tool
+from langchain_core.tools import Tool,StructuredTool
 from langchain.load import dumps, loads
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_community.vectorstores import Chroma
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from dotenv import load_dotenv
+from pydantic.v1 import BaseModel, Field
 
 # --- Load Environment Variables ---
 # Ensures the GOOGLE_API_KEY is loaded from a .env file.
@@ -25,11 +26,41 @@ print("🔑 API Key Loaded:", "Yes" if os.getenv("GOOGLE_API_KEY") else "No")
 DIRECTORY_PATH = "./static/policydoc"
 PERSIST_PATH = "./chroma_store"
 EMBEDDING_MODEL = "models/embedding-001"
-GENERATION_MODEL = "gemini-1.5-flash"
+GENERATION_MODEL = "gemini-2.0-flash"
 CHUNK_SIZE = 300
 CHUNK_OVERLAP = 50
+# Define the input schema for the tool using Pydantic
+class PolicyQueryInput(BaseModel):
+    """Input model for the policy query tool."""
+    question: str = Field(description="The question to ask about the policy documents.")
 
+def reciprocal_rank_fusion(results: list[list], k=60):
+    
+    # Initialize a dictionary to hold fused scores for each unique document
+    fused_scores = {}
 
+    # Iterate through each list of ranked documents
+    for docs in results:
+        # Iterate through each document in the list, with its rank (position in the list)
+        for rank, doc in enumerate(docs):
+            # Convert the document to a string format to use as a key (assumes documents can be serialized to JSON)
+            doc_str = dumps(doc)
+            # If the document is not yet in the fused_scores dictionary, add it with an initial score of 0
+            if doc_str not in fused_scores:
+                fused_scores[doc_str] = 0
+            # Retrieve the current score of the document, if any
+            previous_score = fused_scores[doc_str]
+            # Update the score of the document using the RRF formula: 1 / (rank + k)
+            fused_scores[doc_str] += 1 / (rank + k)
+
+    # Sort the documents based on their fused scores in descending order to get the final reranked results
+    reranked_results = [
+        (loads(doc), score)
+        for doc, score in sorted(fused_scores.items(), key=lambda x: x[1], reverse=True)
+    ]
+
+    # Return the reranked results as a list of tuples, each containing the document and its fused score
+    return reranked_results
 # --- Helper Function ---
 def _get_unique_union(documents: List[List[Document]]) -> List[Document]:
     """
@@ -43,7 +74,7 @@ def _get_unique_union(documents: List[List[Document]]) -> List[Document]:
     return [loads(doc) for doc in unique_docs]
 
 
-def make_policy_query_tool(config: RunnableConfig) -> Tool:
+def make_policy_query_tool(config: RunnableConfig,*args) -> Tool:
     """
         Answers questions 
         1. about SCIM scheam of users. 
@@ -81,78 +112,81 @@ def make_policy_query_tool(config: RunnableConfig) -> Tool:
         vectorstore.persist()
         print(f"✅ Vectorstore created and persisted at {PERSIST_PATH}")
 
-    # 3. Initialize Retriever
-    retriever = vectorstore.as_retriever()
-
-    # 4. Define Multi-Query Prompt Chain for better retrieval
-    multi_query_template = """You are an AI language model assistant. Your task is to generate five
-        different versions of the given user question to retrieve relevant documents from a vector
-        database. 
-                
-        **1. Core Concepts**
-
-        DirXML Script is a structured language for defining identity management policies. The fundamental unit of policy execution is the **Policy** (`<policy>`). A `<policy>` operates on an XDS document, which is comprised of constituent **operations** (elements that are children of `<input>` or `<output>`).
-
-        As a policy is applied to an operation, that operation becomes the **current operation**. The object described by the `src-dn`, `src-entry-id`, `dest-dn`, `dest-entry-id`, and/or `association` from the current operation becomes the **current object**.
-
-        A `<policy>` consists of an ordered set of **Rules** (`<rule>`). Each `<rule>` defines a set of **Conditions** (`<conditions>`) to be tested and an ordered set of **Actions** (`<actions>`) to be performed when the conditions are met.
-
-        Actions often require additional data or nested logic, which are provided by **Arguments** (`<arg-*>`). Most arguments, in turn, contain **Tokens** (`<token-*>`) which expand to dynamic values at runtime based on the rule evaluation context. The results of token expansion are concatenated to form the argument's value. This forms a hierarchical structure: **Policy -> Rule -> Conditions + Actions -> Arguments -> Tokens**.
-
-        **2. Policy Structure (`<policy>`)**
-
-        The `<policy>` element is the **top-level container** for defining the policy logic. Its primary purpose is to operate on an XDS document, examining and modifying it.
-
-        *   **Allowed Content:**
-            *   An optional `<description>` element.
-            *   An ordered set of `<rule>` or `<include>` elements.
-        *   **Parent Element:** None.
-        *   **Basic Operation:** The policy is applied separately to each operation within the XDS document. Each rule within the policy is applied in order to the current operation, unless an action stops further processing.
-        *   **Variables:** DirXML Script supports **global variables** (read-only, from Global Configuration Values defined for the driver or driver set) and **local variables** (set by a policy). Local variables can have either **policy scope** (visible only during the processing of the current operation by the setting policy) or **driver scope** (visible from all DirXML Script policies within the same driver until it stops). If a variable exists in both scopes, the policy-scoped variable takes precedence. Variable names must be legal XML Names.
-            *   **Variable Expansion:** Many elements support dynamic variable expansion using the format `$$variable-name$$`. A literal `$` must be escaped with an additional `$` (e.g., `$$100.00`).
-        *   **Date/Time Parameters:** Tokens dealing with dates/times support `format`, `language`, and `time zone` arguments. Formats starting with '!' are named formats; otherwise, they use `java.text.SimpleDateFormat` patterns. Language arguments conform to IETF RFC3066, and time zone arguments are identifiers recognizable by `java.util.TimeZone.getTimeZone()`.
-        *   **XPATH Evaluation:** Arguments to some conditions and actions take an XPATH 1.0 expression. The context includes the current operation as the context node (unless specified otherwise), available variables (local policy > local driver > global GCVs precedence), explicitly and implicitly defined namespaces, built-in XPATH 1.0 functions, Java extension functions, and ECMAScript extension functions.
-        *   **Include Element (`<include>`):** This element includes rules from another policy by referencing its DN. The DN can be relative to the including policy. Inclusion is recursive, but a policy cannot directly or indirectly include itself. It has no content.
-
-        **3. Rule Structure (`<rule>`)**
-
-        Original question: {question}"""
-
-    generate_queries_chain = (
-        ChatPromptTemplate.from_template(multi_query_template)
-        | ChatGoogleGenerativeAI(model=GENERATION_MODEL, temperature=0)
-        | StrOutputParser()
-        | (lambda x: x.split("\n"))
-    )
-
-    # 5. Define the full RAG chain
-    retrieval_chain = generate_queries_chain | retriever.map() | _get_unique_union
-    contextual_prompt = ChatPromptTemplate.from_template(
-        "Answer the following question based on this context:\n\n{context}\n\nQuestion: {question}"
-    )
-    print("quesrion chain ",retrieval_chain);
-    rag_chain = (
-        {"context": retrieval_chain, "question": itemgetter("question")}
-        | contextual_prompt
-        | ChatGoogleGenerativeAI(model=GENERATION_MODEL, temperature=0)
-        | StrOutputParser()
-    )
-
+   
     # --- This is the function that the tool will execute ---
     def _query_policy_documents(
-        question: str, runnable_config: Optional[RunnableConfig] = None
+        question: str
     ) -> str:
         """
         The internal function that executes the RAG chain to answer the question.
         """
+         # 3. Initialize Retriever
+        retriever = vectorstore.as_retriever()
+
+        # 4. Define Multi-Query Prompt Chain for better retrieval
+        multi_query_template = """You are an AI language model assistant. Your task is to generate five
+            different versions of the given user question to retrieve relevant documents from a vector
+            database. 
+                    
+            **1. Core Concepts**
+
+            DirXML Script is a structured language for defining identity management policies. The fundamental unit of policy execution is the **Policy** (`<policy>`). A `<policy>` operates on an XDS document, which is comprised of constituent **operations** (elements that are children of `<input>` or `<output>`).
+
+            As a policy is applied to an operation, that operation becomes the **current operation**. The object described by the `src-dn`, `src-entry-id`, `dest-dn`, `dest-entry-id`, and/or `association` from the current operation becomes the **current object**.
+
+            A `<policy>` consists of an ordered set of **Rules** (`<rule>`). Each `<rule>` defines a set of **Conditions** (`<conditions>`) to be tested and an ordered set of **Actions** (`<actions>`) to be performed when the conditions are met.
+
+            Actions often require additional data or nested logic, which are provided by **Arguments** (`<arg-*>`). Most arguments, in turn, contain **Tokens** (`<token-*>`) which expand to dynamic values at runtime based on the rule evaluation context. The results of token expansion are concatenated to form the argument's value. This forms a hierarchical structure: **Policy -> Rule -> Conditions + Actions -> Arguments -> Tokens**.
+
+            **2. Policy Structure (`<policy>`)**
+
+            The `<policy>` element is the **top-level container** for defining the policy logic. Its primary purpose is to operate on an XDS document, examining and modifying it.
+
+            *   **Allowed Content:**
+                *   An optional `<description>` element.
+                *   An ordered set of `<rule>` or `<include>` elements.
+            *   **Parent Element:** None.
+            *   **Basic Operation:** The policy is applied separately to each operation within the XDS document. Each rule within the policy is applied in order to the current operation, unless an action stops further processing.
+            *   **Variables:** DirXML Script supports **global variables** (read-only, from Global Configuration Values defined for the driver or driver set) and **local variables** (set by a policy). Local variables can have either **policy scope** (visible only during the processing of the current operation by the setting policy) or **driver scope** (visible from all DirXML Script policies within the same driver until it stops). If a variable exists in both scopes, the policy-scoped variable takes precedence. Variable names must be legal XML Names.
+                *   **Variable Expansion:** Many elements support dynamic variable expansion using the format `$$variable-name$$`. A literal `$` must be escaped with an additional `$` (e.g., `$$100.00`).
+            *   **Date/Time Parameters:** Tokens dealing with dates/times support `format`, `language`, and `time zone` arguments. Formats starting with '!' are named formats; otherwise, they use `java.text.SimpleDateFormat` patterns. Language arguments conform to IETF RFC3066, and time zone arguments are identifiers recognizable by `java.util.TimeZone.getTimeZone()`.
+            *   **XPATH Evaluation:** Arguments to some conditions and actions take an XPATH 1.0 expression. The context includes the current operation as the context node (unless specified otherwise), available variables (local policy > local driver > global GCVs precedence), explicitly and implicitly defined namespaces, built-in XPATH 1.0 functions, Java extension functions, and ECMAScript extension functions.
+            *   **Include Element (`<include>`):** This element includes rules from another policy by referencing its DN. The DN can be relative to the including policy. Inclusion is recursive, but a policy cannot directly or indirectly include itself. It has no content.
+
+            **3. Rule Structure (`<rule>`)**
+
+            Original question: {question}"""
+
+        generate_queries_chain = (
+            ChatPromptTemplate.from_template(multi_query_template)
+            | ChatGoogleGenerativeAI(model=GENERATION_MODEL, temperature=0)
+            | StrOutputParser()
+            | (lambda x: x.split("\n"))
+        )
+
+        # 5. Define the full RAG chain
+        retrieval_chain = generate_queries_chain | retriever.map() | reciprocal_rank_fusion
+        contextual_prompt = ChatPromptTemplate.from_template(
+            "Answer the following question based on this context:\n\n{context}\n\nQuestion: {question}"
+        )
+        print("quesrion chain ",retrieval_chain);
+        rag_chain = (
+            {"context": retrieval_chain, "question": itemgetter("question")}
+            | contextual_prompt
+            | ChatGoogleGenerativeAI(model=GENERATION_MODEL, temperature=0)
+            | StrOutputParser()
+        )
+
         print(f"💬 Invoking RAG chain with question: '{question}'")
-        return rag_chain.invoke({"question": question}, config=runnable_config)
+        doc = rag_chain.invoke({"question": question})
+        return doc
 
     # --- Return the configured Tool ---
     return Tool.from_function(
         func=_query_policy_documents,
         name="query_policy_documents",
-        return_direct=True,  # ensures the agent returns this tool’s output directly
+        return_direct=True, 
+        # args_schema=PolicyQueryInput,
         description=(
             """
                 Answers questions 
@@ -167,22 +201,22 @@ def make_policy_query_tool(config: RunnableConfig) -> Tool:
         *Explain a policy given a policy xml .
         
         """
-        ),
-    )
+        )
+        )
 
 
 # --- Example Usage ---
-if __name__ == "__main__":
+# if __name__ == "__main__":
     # This block demonstrates how to create and use the tool.
     
     # 1. Create the tool instance. The setup logic runs here.
-    policy_tool = make_policy_query_tool({})
+    # policy_tool = make_policy_query_tool()
 
     # 2. Define the user's question.
-    user_question = "write a sample policy to veto if user last name is not prosent"
+    # user_question = "write a sample policy to veto if user last name is not prosent"
     
     # 3. Invoke the tool with the question.
-    final_answer = policy_tool.invoke({"question": user_question})
+    # final_answer = policy_tool.invoke({"question": user_question})
     
-    print("\n--- Final Answer ---")
-    print(final_answer)
+    # print("\n--- Final Answer ---")
+    # print(final_answer)

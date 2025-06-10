@@ -31,7 +31,7 @@ def make_group_details_tool(config: RunnableConfig) -> Tool:
         if cookie:
             headers["Cookie"] = cookie
         response = http_client.get(
-            f"{os.getenv('ILM_HOST')}/v2/ilm/ds/driver/{driver_id}", headers=headers
+            f"{os.getenv('ILM_HOST')}/v2/ilm/ds/Drivers/{driver_id}", headers=headers
         )
         # Map SCIM extension key to valid Python identifier
         if "urn:ietf:params:scim:schemas:ilm:static:1.0:Group" in response:
@@ -71,7 +71,7 @@ def make_list_drivers_tool(config: RunnableConfig) -> Tool:
         if cookie:
             headers["Cookie"] = cookie
         response = http_client.get(
-            f"{os.getenv('ILM_HOST')}/v2/ilm/ds/drivers?startIndex=1&count=100",
+            f"{os.getenv('ILM_HOST')}/v2/ilm/ds/Drivers?startIndex=1&count=100",
             headers=headers,
         )
         # Normalize each group in the list
@@ -155,8 +155,8 @@ def make_driver_details_tool(config: RunnableConfig) -> Tool:
 
 # List drivers
 
-def make_list_drivers_Detail_tool(config: RunnableConfig) -> Tool:
-    def _make_list_drivers_Detail_tool(*args, **kwargs) -> Dict[str, Any]:
+def make_list_drivers_tool(config: RunnableConfig) -> Tool:
+    def _make_list_drivers_tool(*args, **kwargs) -> Dict[str, Any]:
         """Retrieves a list of drivers in ILM."""
         cookie = config.get("metadata", {}).get("cookie")
         anticsrftoken = config.get("metadata", {}).get("anticsrftoken")
@@ -171,9 +171,9 @@ def make_list_drivers_Detail_tool(config: RunnableConfig) -> Tool:
         )
         return response  # type: ignore
     return Tool.from_function(
-        func=_make_list_drivers_Detail_tool,
+        func=_make_list_drivers_tool,
         name="_make_list_drivers_Detail_tool",
-        description="Retrieves the drivers details",
+        description="Retrieves the drivers list",
     )
 
 

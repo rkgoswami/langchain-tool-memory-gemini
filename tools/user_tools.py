@@ -4,6 +4,7 @@ from langchain_core.runnables import RunnableConfig
 import base64
 from HttpClient import HttpClient
 from typing import TypedDict, List, Dict, Any, Optional
+import json
 
 http_client = HttpClient()
 
@@ -99,19 +100,43 @@ def make_user_details_tool(config: RunnableConfig) -> Tool:
         description="Fetches details of a user given their ID.",
     )
 
+# Assume this helper function exists from our previous conversation
+def parse_scim_users_to_markdown(scim_data: dict) -> str:
+    # ... (the full implementation of the dynamic parser goes here) ...
+    # This function takes the JSON dictionary and returns a Markdown string.
+    users = scim_data.get("Resources", [])
+    if not users:
+        return "No user resources found in the SCIM response."
+    
+    headers = ['id', 'userName', 'displayName', 'active']
+    first_user = users[0]
+    final_headers = [h for h in headers if h in first_user]
+    
+    if 'emails' in first_user:
+        final_headers.append('primaryEmail')
+
+    md_lines = ["| " + " | ".join(final_headers) + " |"]
+    md_lines.append("| " + " | ".join(['---'] * len(final_headers)) + " |")
+
+    for user in users:
+        row = []
+        for header in final_headers:
+            if header == 'primaryEmail':
+                emails = user.get('emails', [])
+                value = next((e.get('value') for e in emails if e.get('primary')), "N/A")
+            else:
+                value = user.get(header, "N/A")
+            row.append(str(value).replace("|", "\\|"))
+        md_lines.append("| " + " | ".join(row) + " |")
+
+    return "\n".join(md_lines)
+
 
 def make_list_users_tool(config: RunnableConfig) -> Tool:
-    def _list_users(*args, **kwargs) ->  Dict[str, List[UserDetail]]:
-        """Retrieves a list of users in ILM.
-        Args:
-            input
-        Returns:
-            dict: JSON response containing a list of users.
-
-        Example:
-            >>> list_users()
-            {'users': [{'id': 'user1', 'name': 'John Doe'}, {'id': 'user2', 'name': 'Jane Smith'}]}
-        """
+    # The function now correctly hints that it returns a string.
+    # The unused `*args` have been removed.
+    def _list_users(anyparams) -> str:
+        """Retrieves a list of users and formats them as a Markdown table."""
         print(f"RunnableConfig (injected): {config}")
         cookie = config.get("metadata", {}).get("cookie")
         anticsrftoken = config.get("metadata", {}).get("anticsrftoken")
@@ -120,17 +145,27 @@ def make_list_users_tool(config: RunnableConfig) -> Tool:
             headers["X-CSRF-Token"] = anticsrftoken
         if cookie:
             headers["Cookie"] = cookie
-        return http_client.get(
+            
+        # 1. Get the raw dictionary response from the API
+        response_dict = http_client.get(
             f"{os.getenv('ILM_HOST')}/v2/ilm/ds/Users?startIndex=1&count=100",
             headers=headers,
         )
 
+        # 2. Check for errors (optional but recommended)
+        if not isinstance(response_dict, dict) or "Resources" not in response_dict:
+             # If the response is not a valid user list, format it as a JSON string
+             return f"```json\n{json.dumps(response_dict, indent=2)}\n```"
+
+        # 3. Convert the dictionary to a Markdown string before returning
+        return parse_scim_users_to_markdown(response_dict)
+
     return Tool.from_function(
         func=_list_users,
         name="list_users",
-        description="Retrieves a list of all users in the system.",
+        return_direct=True, 
+        description="Retrieves a list of all users in the system, formatted as a table.",
     )
-
 
 # New function for graph usage
 def make_get_user_detail_for_graph_tool(config: RunnableConfig) -> Tool:
@@ -171,7 +206,8 @@ def make_get_user_detail_for_graph_tool(config: RunnableConfig) -> Tool:
         return response  # type: ignore
     return Tool.from_function(
         func=get_user_detail_for_graph,
-        name="list_users",
+        name="get_user_detail_for_graph",
+        return_direct=True, 
         description="Retrieves user get_user_detail_for_graph.",
     )
 

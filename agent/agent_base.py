@@ -1,4 +1,3 @@
-import tiktoken
 from langchain.agents import initialize_agent, AgentType, load_tools
 from langchain.memory import ConversationBufferMemory
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -17,7 +16,7 @@ class ChatAgent:
         self.cookie = cookie
         self.token = token
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash-lite", temperature=temperature
+            model="gemini-1.5-flash", temperature=temperature
         )
         self.tools = self._load_all_tools()
         self.memory = ConversationBufferMemory(
@@ -57,12 +56,12 @@ class ChatAgent:
             # return_intermediate_steps=True,
             max_iterations=5,
             verbose=True,
-            agent_kwargs={
-            "format_instructions": (
-                "Respond in Markdown, or simple engiish language, Use tables for structure. python code , json js code any langualre Wrap JSON in ```json blocks. "
-                "If tool output is already valid Markdown, just return it."
-            ),
-        },
+        #     agent_kwargs={
+        #     "format_instructions": (
+        #         "Respond in Markdown, or simple engiish language, Use tables for structure. python code , json js code any langualre Wrap JSON in ```json blocks. "
+        #         "If tool output is already valid Markdown, just return it."
+        #     ),
+        # },
             description="""
             ### **Output Formatting & Behavior Expectations**
                 if data is already in a structured format like Markdown, use it directly in the response.
@@ -74,15 +73,7 @@ class ChatAgent:
                 * **Precision:** Be technically precise and concise. Do not repeat yourself.
                 * **XML Explanation:** When explaining XML, focus on clarity; use bullet points if helpful.
                 * **Error Handling:** Avoid hallucination. If a tool fails, explain the error gracefully.
-
-                2.  Analyze the context provided by the tool.
-                3.  If you have enough information, formulate a final answer to the original question.
-                4.  If you do not have enough information, you may use other tools to gather more details.
-
-                IMPORTANT: You should  use your tools to find an answer if none matches use `make_policy_query_tool`. 
-                The final response to the user should not be a tool call.
-
-                Begin!                                  
+                       
 
                 Question: {input}
                 {agent_scratchpad}
@@ -93,7 +84,7 @@ class ChatAgent:
     def estimate_tokens(self, text: str) -> int:
         return max(1, len(text) // 4)  # Approx: 1 token = 4 chars
 
-    def _get_trimmed_history_with_summary(self, messages, max_tokens=10000):
+    def _get_trimmed_history_with_summary(self, messages, max_tokens=4000):
 
         total_tokens = 0
         recent_messages = []
@@ -128,7 +119,7 @@ class ChatAgent:
         # Return summary + recent as the prompt history
         combined = (
             f"use the Summary of earlier conversation to answer if required for memory : {summary}\n\n"
-            + "\n".join(reversed(recent_messages))
+            # + "\n".join(reversed(recent_messages))
         )
         return combined.strip()
 
@@ -136,11 +127,13 @@ class ChatAgent:
         try:
             # Use summarized + recent history as context
             history = self._get_trimmed_history_with_summary(
-                self.memory.chat_memory.messages, max_tokens=4000
+                self.memory.chat_memory.messages, max_tokens=5000
             )
-
+            
             # Compose the final prompt manually
+            # final_input = f"history:{history}\nUser: {user_input}"
             final_input = f"\nUser: {user_input}"
+            print("question : ",final_input)
             # print(f"Created config: {config}")  # Debug log
 
             # Invoke the agent with the composed input
