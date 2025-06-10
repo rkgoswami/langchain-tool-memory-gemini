@@ -1,5 +1,8 @@
 4894_git.pub
 4894_git
+.venv/*
+static/*
 .env
 **/__pycache__/**
+chroma_store/*
 

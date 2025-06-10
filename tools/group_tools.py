@@ -90,9 +90,9 @@ def make_group_details_tool(config: RunnableConfig) -> Tool:
 
 
 def make_list_groups_tool(config: RunnableConfig) -> Tool:
-    def _list_groups(*args, **kwargs) -> Dict[str, List[GroupDetail]]:
+    def _list_groups(input,*args, **kwargs) -> Dict[str, List[GroupDetail]]:
         """Retrieves a list of groups in ILM.
-
+        Args: input
         Returns:
             Dict[str, List[GroupDetail]]: JSON response containing a list of groups.
 

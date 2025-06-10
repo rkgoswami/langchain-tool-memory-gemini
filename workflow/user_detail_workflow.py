@@ -43,7 +43,7 @@ User Data:
 """
 
 
-def format_user_data(state: UserState, config: RunnableConfig) -> dict:
+def format_user_data(state: UserState, config: RunnableConfig) -> str:
     """Formats the user data, mapping drivers to UserDirXMLAssociation and marking presence with green or red.
     ### **Output Formatting & Behavior Expectations**
             * **Markdown:** Always return responses in well-formatted **Markdown**.
@@ -85,7 +85,8 @@ def format_user_data(state: UserState, config: RunnableConfig) -> dict:
         + "## Driver Associations\n\n"
         + table
     )
-    return {"result": markdown}
+    return  markdown
+
 
 def fetch_driver_details(state: UserState, config: RunnableConfig) -> dict:
     """

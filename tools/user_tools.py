@@ -104,7 +104,7 @@ def make_list_users_tool(config: RunnableConfig) -> Tool:
     def _list_users(*args, **kwargs) ->  Dict[str, List[UserDetail]]:
         """Retrieves a list of users in ILM.
         Args:
-            None
+            input
         Returns:
             dict: JSON response containing a list of users.
 
@@ -172,7 +172,7 @@ def make_get_user_detail_for_graph_tool(config: RunnableConfig) -> Tool:
     return Tool.from_function(
         func=get_user_detail_for_graph,
         name="list_users",
-        description="Retrieves a list of all users in the system.",
+        description="Retrieves user get_user_detail_for_graph.",
     )
 
 

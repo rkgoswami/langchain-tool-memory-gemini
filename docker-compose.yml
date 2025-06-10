@@ -3,6 +3,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.toolbox
+      cache_from:
+        - type=registry,ref=smart-agent:cache
+      args:
+        - APP_VERSION=1.2.3
     container_name: toolbox
     environment:
       - TOOLBOX_CONFIG=/etc/toolbox/config.yaml

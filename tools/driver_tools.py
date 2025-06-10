@@ -9,17 +9,17 @@ http_client = HttpClient()
 
 
 def make_group_details_tool(config: RunnableConfig) -> Tool:
-    def _get_group_details(group_id: str) -> Any:
-        """Fetches details of a group by its ID.
+    def _get_group_details(driver_id: str) -> Any:
+        """Fetches details of a driver by its ID.
 
         Args:
-            group_id (str): The ID of the group.
+            driver_id (str): The ID of the group.
 
         Returns:
             GroupDetail: JSON response containing group details.
 
         Example:
-            >>> get_group_details(group_id="group123")
+            >>> get_group_details(driver_id="group123")
             {'name': 'Admin Group', 'members': 10}
         """
         print(f"RunnableConfig (injected): {config}")
@@ -31,7 +31,7 @@ def make_group_details_tool(config: RunnableConfig) -> Tool:
         if cookie:
             headers["Cookie"] = cookie
         response = http_client.get(
-            f"{os.getenv('ILM_HOST')}/v2/ilm/ds/Groups/{group_id}", headers=headers
+            f"{os.getenv('ILM_HOST')}/v2/ilm/ds/driver/{driver_id}", headers=headers
         )
         # Map SCIM extension key to valid Python identifier
         if "urn:ietf:params:scim:schemas:ilm:static:1.0:Group" in response:
@@ -52,16 +52,16 @@ def make_group_details_tool(config: RunnableConfig) -> Tool:
     )
 
 
-def make_list_groups_tool(config: RunnableConfig) -> Tool:
-    def _list_groups(*args, **kwargs) -> Dict[str, List[Any]]:
-        """Retrieves a list of groups in ILM.
+def make_list_drivers_tool(config: RunnableConfig) -> Tool:
+    def _list_drivers(*args, **kwargs) -> Dict[str, List[Any]]:
+        """Retrieves a list of drivers in ILM.
 
         Returns:
-            Dict[str, List[GroupDetail]]: JSON response containing a list of groups.
+            Dict[str, List[GroupDetail]]: JSON response containing a list of drivers.
 
         Example:
-            >>> list_groups()
-            {'groups': [{'id': 'group1', 'name': 'Admins'}, {'id': 'group2', 'name': 'Users'}]}
+            >>> list_drivers()
+            {'drivers': [{'id': 'group1', 'name': 'Admins'}, {'id': 'group2', 'name': 'Users'}]}
         """
         cookie = config.get("metadata", {}).get("cookie")
         anticsrftoken = config.get("metadata", {}).get("anticsrftoken")
@@ -71,12 +71,12 @@ def make_list_groups_tool(config: RunnableConfig) -> Tool:
         if cookie:
             headers["Cookie"] = cookie
         response = http_client.get(
-            f"{os.getenv('ILM_HOST')}/v2/ilm/ds/Groups?startIndex=1&count=100",
+            f"{os.getenv('ILM_HOST')}/v2/ilm/ds/drivers?startIndex=1&count=100",
             headers=headers,
         )
         # Normalize each group in the list
-        groups = response.get("groups", [])
-        for group in groups:
+        drivers = response.get("drivers", [])
+        for group in drivers:
             if "urn:ietf:params:scim:schemas:ilm:static:1.0:Group" in group:
                 group["urn_ietf_params_scim_schemas_ilm_static_1_0_Group"] = group.pop("urn:ietf:params:scim:schemas:ilm:static:1.0:Group")
             for member in group.get("members", []):
@@ -88,9 +88,9 @@ def make_list_groups_tool(config: RunnableConfig) -> Tool:
         return response  # type: ignore
 
     return Tool.from_function(
-        func=_list_groups,
-        name="list_groups",
-        description="Retrieves a list of all groups in the system.",
+        func=_list_drivers,
+        name="list_drivers",
+        description="Retrieves a list of all drivers in the system.",
     )
 
 
@@ -155,8 +155,8 @@ def make_driver_details_tool(config: RunnableConfig) -> Tool:
 
 # List drivers
 
-def make_list_drivers_tool(config: RunnableConfig) -> Tool:
-    def _list_drivers(*args, **kwargs) -> Dict[str, Any]:
+def make_list_drivers_Detail_tool(config: RunnableConfig) -> Tool:
+    def _make_list_drivers_Detail_tool(*args, **kwargs) -> Dict[str, Any]:
         """Retrieves a list of drivers in ILM."""
         cookie = config.get("metadata", {}).get("cookie")
         anticsrftoken = config.get("metadata", {}).get("anticsrftoken")
@@ -171,9 +171,9 @@ def make_list_drivers_tool(config: RunnableConfig) -> Tool:
         )
         return response  # type: ignore
     return Tool.from_function(
-        func=_list_drivers,
-        name="list_drivers",
-        description="Retrieves a list of all drivers in the system.",
+        func=_make_list_drivers_Detail_tool,
+        name="_make_list_drivers_Detail_tool",
+        description="Retrieves the drivers details",
     )
 
 
